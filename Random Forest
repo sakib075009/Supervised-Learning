@@ -1,0 +1,95 @@
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+
+
+class BrandPredictor:
+    """
+    Model That predicts Car Brand using RandomForestClassifier
+    """
+
+    def __init__(self, data_url='cars.csv', features=["mpg", "cylinders", "cubicinches", "hp", "weightlbs"],
+                 results=["brand"], total_trees=120):
+        self._data_url = data_url = 'D:\GB Machine Larning Online Course\datasets collection\ikhtiyar files\selected2\selected2\decision_tree\cars.csv'
+        self._data = self._get_data()
+        self._features = features
+        self._results = results
+        self._model = RandomForestClassifier(n_estimators=total_trees)
+        x_train, x_test, y_train, y_test = self._split_test_train_data()
+        self._train_model(x_train, y_train)
+        self._test_model(x_test, y_test)
+
+    def _get_data(self):
+        """
+        Returns data from the data url
+        :return: DataFrame object
+        """
+        return pd.read_csv(self._data_url, na_values=['', ' ']).dropna()
+
+    def _get_features(self):
+        """
+        Returns features from the input data
+
+        :return: List[List[int]]
+        """
+        return self._data[self._features].values
+
+    def _get_results(self):
+        """
+        Returns results from the input data
+
+        :return: List[List[int]]
+        """
+        return self._data[self._results].values
+
+    def _split_test_train_data(self):
+        """
+        Splits train and test data from the input data
+
+        :return: tuples(x_train, y_train, x_test, y_test)
+        """
+        return train_test_split(self._get_features(), self._get_results(), random_state=0)
+
+    def _train_model(self, x_train, y_train):
+        """
+        Takes x_train and y_train data and trains model accordingly
+
+        :param x_train: List[List[int]]
+        :param y_train: List[List[int]]
+        :return: None
+        """
+        self._model.fit(x_train, y_train)
+
+    def _test_model(self, x_test, y_test):
+        """
+        Takes x_test and y_test data and tests model accordingly
+
+        :param x_test: List[List[int]]
+        :param y_test: List[List[int]]
+        :return: None
+        """
+        self._model.score(x_test, y_test)
+
+    def predict_brand(self, features):
+        """
+        Takes features as input and returns your predicted car brand
+
+        :param features: List[int]
+        :return: List[str]
+        """
+        return self._model.predict([features])
+
+
+if __name__ == '__main__':
+    predictor = BrandPredictor()
+    predictions = int(input("How many predictions?: "))
+    while predictions:
+        mpg = float(input("Enter MPG: "))
+        cylinders = float(input("Enter Cylinders: "))
+        cubicinches = float(input("Enter Cubicinches: "))
+        hp = float(input("Enter Horse Power: "))
+        weightlbs = float(input("Enter Weight in lbs: "))
+
+        predicted_result = predictor.predict_brand([mpg, cylinders, cubicinches, hp, weightlbs])
+        print("Your car brand is {}".format(predicted_result[0]))
+        predictions -= 1
