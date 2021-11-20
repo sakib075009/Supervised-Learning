@@ -1,0 +1,231 @@
+# Exploratory data analysis
+# correlation, normalization, scikitlearn, feature selection
+# extra treee regressor, linear regression, random forest, performance metrics
+
+import numpy as np  # linear algebra
+import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+
+# for dirname, _, filenames in os.walk('/kaggle/input'):
+#     for filename in filenames:
+#         print(os.path.join(dirname, filename))
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+path = r'D:\GB Machine Larning Online Course\datasets collection\ikhtiyar files\selected2\selected2\random forest\energydata_complete.csv'
+dataLoad = pd.read_csv(path, index_col='date')
+
+dataLoad.head()
+
+dataLoad.shape
+
+dataLoad.info()
+
+dataLoad.describe()
+
+dataLoad.isnull().sum()
+
+"""
+
+Exploratory Data Analysis
+
+Then we do more exploratory data analysis to know the distribution of dataset. 
+I use univariate distribution analysis for each features in the data sets. 
+Also, I do bivarite analysis to know the correlation between target variable 
+which in here is Appliances column and the predictor variable. 
+In the bivariate analysis I also make correlation heatmap to understand correlation between each feature. 
+From the exploratory data analysis we know that some predictor almost have normal distribution.
+
+Univariate
+"""
+
+dataVisual = dataLoad.drop(['rv1', 'rv2'], axis=1)
+
+# Distribution plot for each features
+
+ls = []
+colName = [j for j in dataVisual.columns]
+a = 0
+while a < 7:
+    for i in range(5):
+        ls.append((a, i))
+    a += 1
+fig, ax = plt.subplots(6, 5, figsize=(28, 30))
+for k in range(26):
+    sns.histplot(ax=ax[ls[k][0], ls[k][1]], x=colName[k], data=dataVisual)
+
+a = 0
+while a < 7:
+    for i in range(5):
+        ls.append((a, i))
+    a += 1
+fig, ax = plt.subplots(6, 5, figsize=(28, 30))
+for k in range(26):
+    sns.boxplot(ax=ax[ls[k][0], ls[k][1]], y=colName[k], data=dataVisual)
+
+# %%
+
+# Bivariate
+
+b = 0
+while b < 7:
+    for i in range(5):
+        ls.append((b, i))
+    b += 1
+fig, ax = plt.subplots(5, 5, figsize=(28, 30))
+for k in range(25):
+    sns.scatterplot(ax=ax[ls[k][0], ls[k][1]], x=colName[k + 1], y=colName[0], data=dataVisual)
+
+corr = dataVisual.corr()
+plt.figure(figsize=(30, 30))
+sns.heatmap(corr, annot=True)
+
+"""
+
+Preprocessing Data
+
+Before the data were pushed to model, I do some preprocessing to avoid poor performance of the model. 
+I do normalization to make distribution of the features become normal. 
+Also, I try to remove outliers of the data. It is because for predictive model that 
+I will use sensitive to outliers and it can make poor performance model. 
+After removing outliers I have found many missing value of the features. 
+I encounter it with filling missing value with imputation method. 
+I use mean value of each feature to fill the missing value.
+
+"""
+## Data Normalization
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler()
+dataTrans = pd.DataFrame(scaler.fit_transform(dataVisual), columns=dataVisual.columns)
+dataTrans.head()
+
+# eliminating outliers
+Q1 = dataTrans.quantile(0.25)
+Q3 = dataTrans.quantile(0.75)
+IQR = Q3 - Q1
+
+dataClean = dataTrans[~((dataTrans < (Q1 - IQR * 1.5)) | (dataTrans > (Q3 + IQR * 1.5)))]
+dataClean.head()
+dataClean.shape
+
+from sklearn.impute import SimpleImputer
+
+imputer = SimpleImputer(strategy='mean')
+dataImp = pd.DataFrame(imputer.fit_transform(dataClean), columns=dataClean.columns)
+dataImp.head()
+
+dataImp.isnull().sum()
+
+"""
+
+Features Selection
+
+Then I do feature selection to make sure I use only importance features for training 
+the model and predicting the energy consumption with small error. I try two diffrence 
+approaches for it. First i am using univariate selection with F value. Then, 
+I am also using features importance to find importance feature. 
+In both method I decide to select the 10 best features.
+
+Univariate Selection
+"""
+
+dataTarget = dataImp['Appliances']
+dataPred = dataImp.drop('Appliances', axis=1)
+
+from sklearn.model_selection import train_test_split
+
+x_train, x_test, y_train, y_test = train_test_split(dataPred, dataTarget, test_size=0.2, random_state=0)
+
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_regression
+
+selector = SelectKBest(score_func=f_regression, k=10)
+fit = selector.fit(dataPred, dataTarget)
+dfscores = pd.DataFrame(fit.scores_)
+dfpred = pd.DataFrame(dataPred.columns)
+featScore = pd.concat([dfpred, dfscores], axis=1)
+featScore.columns = ['Feature', 'Score']
+featScore.nlargest(10, 'Score')
+
+# %%
+# Feature Importance
+
+from sklearn.ensemble import ExtraTreesRegressor
+
+model = ExtraTreesRegressor()
+model.fit(x_train, y_train)
+feat_importance = pd.Series(model.feature_importances_, index=x_train.columns)
+feat_importance.nlargest(10).plot(kind='barh')
+
+"""
+Data Splitting¶
+
+I am splitting data into two parts training and test data set for each variable. 
+I do this with proportion 80 % of total data are training dataset and the rest are test dataset. 
+Then I split the training dataset again in to two parts training and validation dataset. 
+The second spltting I use proportion 80% of the training data are training data and the rest of data are validation dataset.
+"""
+
+y = dataImp['Appliances']
+X = dataImp[['T2', 'T6', 'T8', 'T1', 'T_out', 'T4', 'RH_9', 'RH_6', 'RH_8', 'RH_out', 'lights']]
+
+x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+
+xTrain, xVal, yTrain, yVal = train_test_split(x_train, y_train, test_size=0.2, random_state=0)
+
+"""
+Baseline Model
+
+For baseline model I am using linear regression and random forest regressor. 
+For the linear regression model I keep the parameter deafult. For the random forest regressor 
+I vary the n_estimators parameter from 1 until 100. The metrics to evaluate each model performance is mean absolute error.
+"""
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
+
+regmodel = LinearRegression()
+regmodel = regmodel.fit(xTrain, yTrain)
+predReg = regmodel.predict(xVal)
+maeReg = mean_absolute_error(yVal, predReg)
+print('This is MAE score for Linear Regression : ', round(maeReg, 3))
+
+
+def modelRF(n, xTrain, yTrain, xVal, yVal):
+    modelRF = RandomForestRegressor(n_estimators=n, criterion='mae')
+    modelRF.fit(xTrain, yTrain)
+    predRF = modelRF.predict(xVal)
+    maeRF = mean_absolute_error(yVal, predRF)
+    return print('This is MAE score for Random Forest Regressor model', n, 'estimators : ', round(maeRF, 3))
+
+
+# List of total number of estimator
+n = [1, 5, 10, 20, 25, 50, 75, 100]
+
+for i in n:
+    modelRF(i, xTrain, yTrain, xVal, yVal)
+
+"""
+Model building
+
+Finally I build the model with best performance that I know from baseline model. 
+In here I decide to use random forest regressor model with parameter n_estimators are 
+20 and the criterion parameter is 'mae'.
+"""
+
+modelFinal = RandomForestRegressor(n_estimators=20, criterion='mae')
+modelFinal.fit(x_train, y_train)
+predFinal = modelFinal.predict(x_test)
+maeFinal = mean_absolute_error(y_test, predFinal)
+print('This is MAE score of final model :', round(maeFinal, 3))
+
+# Code ends here
+
+# %%
