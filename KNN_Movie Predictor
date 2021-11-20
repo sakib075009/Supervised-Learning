@@ -1,0 +1,142 @@
+import operator
+
+import pandas as pd
+import numpy as np
+from scipy import spatial
+
+
+class MoviePredictor:
+
+    def __init__(self, data_url=None, col_names=None, input_data_url=None):
+
+        if data_url:
+            self._data_url = data_url
+        else:
+            self._data_url = 'u_data/u.data'
+
+        if col_names:
+            self._col_names = col_names
+        else:
+            self._col_names = ['user_id', 'movie_id', 'rating']
+
+        if input_data_url:
+            self._input_data_url = input_data_url
+        else:
+            self._input_data_url = 'u_data/u.item'
+
+        self._movies = {}
+        self._generate_movie_data()
+
+    def _get_ratings(self, sep='\t'):
+        """
+        Takes csv separator and returns movie ratings
+
+        :param sep: '\t'
+        :return: List
+        """
+        return pd.read_csv(self._data_url, sep=sep, names=self._col_names, usecols=range(len(self._col_names)))
+
+    def _get_movie_properties(self, ratings):
+        """
+        Returns movie properties from the ratings
+
+        :param ratings:
+        :return:
+        """
+        return ratings.groupby('movie_id').agg({'rating': [np.size, np.mean]})
+
+    def _get_normalized_movie_ratings(self, movie_properties):
+        """
+        Takes movie_properties and then normalizes and returns movie num ratings
+        :param movie_properties: DataFrame object
+        :return: DataFrame object
+        """
+        movie_num_ratings = pd.DataFrame(movie_properties['rating']['size'])
+        return movie_num_ratings.apply(lambda x: (x - np.min(x)) / (np.max(x) - np.min(x)))
+
+    def _generate_movie_data(self):
+        """
+        Generates movie data from movie rating and normalized data
+        :return: dict
+        """
+        movie_properties = self._get_movie_properties(self._get_ratings())
+        normalized_ratings = self._get_normalized_movie_ratings(movie_properties)
+        with open(self._input_data_url, encoding="ISO-8859-1") as f:
+            for line in f:
+                fields = line.rstrip('\\n').split('|')
+                movie_id = int(fields[0])
+                name = fields[1]
+                genres = fields[5:25]
+                genres = map(int, genres)
+                self._movies[movie_id] = (name, np.array(list(genres)), normalized_ratings.loc[movie_id].get('size'),
+                                          movie_properties.loc[movie_id].rating.get('mean'))
+
+    def get_movie_data(self):
+        """
+        Returns movies data from generated movie data
+
+        :return: dict
+        """
+        return self._movies
+
+    def _compute_movie_distance(self, movie1, movie2):
+        """
+        Takes two movies data and compute and returns their distances
+
+        :param movie1: dict
+        :param movie2: dict
+        :return: float
+        """
+        genres_1 = movie1[1]
+        genres_2 = movie2[1]
+        genre_distance = spatial.distance.cosine(genres_1, genres_2)
+        popularity_for_1 = movie1[2]
+        popularity_for_2 = movie2[2]
+        popularity_distance = abs(popularity_for_1 - popularity_for_2)
+        return genre_distance + popularity_distance
+
+    def get_neighbours(self, movie_id, k):
+        distances = []
+        neighbors = []
+        for movie in self._movies:
+            if movie != movie_id:
+                dist = self._compute_movie_distance(self._movies[movie_id], self._movies[movie])
+                distances.append((movie, dist))
+
+        distances.sort(key=operator.itemgetter(1))
+
+        for x in range(k):
+            neighbors.append(distances[x][0])
+        return neighbors
+
+    def get_similar_movie_suggestions(self, movie_id, total_neighbours=10):
+        """
+        Takes movie_id and total_neighbours then calculates and returns
+        their average ratings
+
+        :param movie_id: int
+        :param total_neighbours: int
+        :return: float
+        """
+        avg_rating = 0
+        similar_movies = []
+        for neighbour in self.get_neighbours(movie_id, total_neighbours):
+            avg_rating += self._movies[neighbour][3]
+            similar_movies.append(self._movies[neighbour][0])
+        avg_rating /= total_neighbours
+        return self._movies[movie_id][0], avg_rating, similar_movies
+
+
+if __name__ == '__main__':
+    movie_predictor1 = MoviePredictor()
+    for movie_item in range(int(input("How many movies you want to query?: "))):
+        total_similar_movies = int(input("How many movies as suggestion? "))
+        movie_id = int(input("Enter movie id: "))
+        selected_movie, average_rating, similar_movies = movie_predictor1.get_similar_movie_suggestions(
+            movie_id, total_similar_movies)
+        print("Your selected movie is: {}".format(selected_movie))
+        print("*********************")
+        print("{} similar type of movies like '{}' are:".format(total_similar_movies, selected_movie))
+        for idx, movie in enumerate(similar_movies):
+            print("{}. {}".format(idx + 1, movie))
+        print("##############################")
