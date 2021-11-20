@@ -1,0 +1,89 @@
+import csv
+
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+
+
+class HousePredictor:
+
+    def __init__(self, train_data_url='train.csv', test_data_url='test.csv'):
+        # TODO: change url to `train_data_url` instead of `test_data_url`
+        self._train_data = self._get_data(test_data_url)
+        self._test_data = self._get_data(test_data_url)
+        self._features = ['UNDER_CONSTRUCTION', 'RERA', 'BHK_NO.', 'SQUARE_FT', 'READY_TO_MOVE', 'RESALE', 'LONGITUDE',
+                          'LATITUDE']
+        self._results = ['TARGET(PRICE_IN_LACS)']
+        self._model = LinearRegression(normalize=True)
+        self._train_model(self._get_features(self._train_data), self._get_results(self._train_data))
+        self._test_model(self._get_features(self._test_data), self._get_results(self._test_data))
+
+    def _get_data(self, url):
+        """
+        Returns data from the data url
+        :param url: str object
+        :return: DataFrame object
+        """
+        return pd.read_csv(url, na_values=['', ' ']).dropna()
+
+    def _get_features(self, data):
+        """
+        Takes data(DataFrame) and returns features from the input data
+
+        :param data: DataFrame
+        :return: List[List[int]]
+        """
+        return data[self._features].values
+
+    def _get_results(self, data):
+        """
+        Takes data(DataFrame) and returns results from the input data
+
+        :param data: DataFrame
+        :return: List[List[int]]
+        """
+        return data[self._results].values
+
+    def _train_model(self, x_train, y_train):
+        """
+        Takes x_train and y_train data and trains model accordingly
+
+        :param x_train: List[List[int]]
+        :param y_train: List[List[int]]
+        :return: None
+        """
+        self._model.fit(x_train, y_train)
+
+    def _test_model(self, x_test, y_test):
+        """
+        Takes x_test and y_test data and tests model accordingly
+
+        :param x_test: List[List[int]]
+        :param y_test: List[List[int]]
+        :return: None
+        """
+        self._model.score(x_test, y_test)
+
+    def predict_price(self, features):
+        """
+        Takes features as input and returns your predicted glass type
+
+        :param features: List[int]
+        :return: List[str]
+        """
+        return self._model.predict([features])
+
+
+if __name__ == '__main__':
+    # ['POSTED_BY', 'UNDER_CONSTRUCTION', 'RERA', 'BHK_NO.', 'BHK_OR_RK', 'SQUARE_FT',
+    #                           'READY_TO_MOVE', 'RESALE', 'ADDRESS', 'LONGITUDE', 'LATITUDE']
+
+    # ['TARGET(PRICE_IN_LACS)']
+    predictor = HousePredictor()
+    with open('result.csv', 'a+') as outcsv:
+        csv_writer = csv.writer(outcsv, delimiter=',')
+        inputs = [0, 0, 2, 1275.0, 1, 1, 12.274538, 76.644605]
+        output = predictor.predict_price(inputs)[0]
+        results = inputs
+        results.extend(output)
+        print("For input {inputs} price is: {price}".format(inputs=inputs, price=[output[0]]))
+        csv_writer.writerow(results)
