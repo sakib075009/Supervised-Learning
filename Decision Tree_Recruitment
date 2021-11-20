@@ -1,0 +1,172 @@
+import random
+import numpy as np
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier
+
+
+class RecruitmentDecider:
+
+    def __init__(self, data_url=None, max_depth=5):
+        self._model = DecisionTreeClassifier(criterion="entropy", max_depth=max_depth)
+        if data_url:
+            self._data_url = data_url
+        else:
+            self._data_url = 'recruitment_decision_tree.csv'
+        self._data = self._get_data()
+        self._generate_maps()
+        self._train_data, self._test_data = self._split_test_train_data()
+        self._train_model()
+        self._test_model()
+
+    def _generate_maps(self):
+        """
+        Generates various types of map for the data
+
+        :return: None
+        """
+        self._generate_sex_map()
+        self._generate_python_language_map()
+        self._generate_education_map()
+        self._generate_intern_map()
+        self._generate_location_map()
+        self._generate_status_map()
+        self._generate_experience_map()
+        self._generate_offer_map()
+        self._generate_salary_map()
+
+    def _get_data(self):
+        """
+        Returns data extracted from provided data url
+
+        :return: DataFrame
+        """
+        return pd.read_csv('recruitment_decision_tree.csv')
+
+    def _generate_sex_map(self):
+        """
+        Generates sex map from the data
+        :return: None
+        """
+        data_map = {'Male': 1, 'Female': 0}
+        self._data['Gender'] = self._data['Gender'].map(data_map)
+        self._data['Gender'].fillna(0, inplace=True)
+
+    def _generate_python_language_map(self):
+        """
+        Generates python language map from the data
+        :return: None
+        """
+        data_map = {'Yes': 1, 'No': 0}
+        self._data['Python_exp'] = self._data['Python_exp'].map(data_map)
+        self._data['Python_exp'].fillna(0, inplace=True)
+
+    def _generate_education_map(self):
+        """
+        Generates education map from the data
+        :return: None
+        """
+        data_map = {'Graduate': 1, 'Not Graduate': 0}
+        self._data['Education'] = self._data['Education'].map(data_map)
+
+    def _generate_intern_map(self):
+        """
+        Generates intern map from the data
+        :return: None
+        """
+        data_map = {'Yes': 1, 'No': 0}
+        self._data['Internship'] = self._data['Internship'].map(data_map)
+        self._data['Internship'].fillna(np.mean(self._data['Internship']), inplace=True)
+
+    def _generate_location_map(self):
+        """
+        Generates location map from the data
+        :return: None
+        """
+        data_map = {'Urban': 3, 'Semiurban': 2, 'Rural': 1}
+        self._data['Location'] = self._data['Location'].map(data_map)
+
+    def _generate_status_map(self):
+        """
+        Generates status map from the data
+        :return: None
+        """
+        data_map = {'Y': 1, 'N': 0}
+        self._data['Recruitment_Status'] = self._data['Recruitment_Status'].map(data_map)
+
+    def _generate_experience_map(self):
+        """
+        Generates experience map from data
+
+        :return: None
+        """
+        self._data['Experience_Years'].fillna(0, inplace=True)
+
+    def _generate_offer_map(self):
+        """
+        Generates offer map from data
+
+        :return: None
+        """
+        self._data['Offer_History'].fillna(1, inplace=True)
+
+    def _generate_salary_map(self):
+        """
+        Generates salary map from data
+
+        :return: None
+        """
+        self._data['Salary * 10E4'].fillna(np.mean(self._data['Salary * 10E4']), inplace=True)
+
+    def _split_test_train_data(self):
+        """
+        Splits available data to train and test data
+
+        :return: train_data, test_data
+        """
+        random.seed(10)
+        total_records = len(self._data)
+        m = np.random.rand(total_records) < 0.70
+        return self._data[m], self._data[~m]
+
+    def _get_train_data(self):
+        x_train = np.asarray(self._train_data[
+                                 ['Gender', 'Python_exp', 'Experience_Years', 'Education', 'Internship', 'Score',
+                                  'Salary * 10E4', 'Offer_History']])
+        y_train = np.asarray(self._train_data[['Recruitment_Status']])
+        return x_train, y_train
+
+    def _get_test_data(self):
+        x_test = np.asarray(self._test_data[
+                                ['Gender', 'Python_exp', 'Experience_Years', 'Education', 'Internship', 'Score',
+                                 'Salary * 10E4', 'Offer_History']])
+        y_test = np.asarray(self._test_data[['Recruitment_Status']])
+        return x_test, y_test
+
+    def _train_model(self):
+        self._model.fit(*self._get_train_data())
+
+    def _test_model(self):
+        x_test, _ = self._get_test_data()
+        return self._model.predict(x_test)
+
+    def predict(self, data_input):
+        return self._model.predict_proba(data_input)
+
+
+if __name__ == '__main__':
+    # ['Gender', 'Python_exp', 'Experience_Years', 'Education', 'Internship', 'Score', 'Salary * 10E4', 'Offer_History']
+    recruitment_decider = RecruitmentDecider()
+    gender = float(input("Enter Gender: "))
+    python = float(input("Enter python: "))
+    experience = float(input("Enter Experience: "))
+    education = float(input("Enter education: "))
+    internship = float(input("Enter Internship: "))
+    score = float(input("Enter Score: "))
+    salary = float(input("Enter Salary: "))
+    offer = float(input("Enter Offer History: "))
+    probability = recruitment_decider.predict([[gender, python, experience, education, internship, score, salary,
+                                                offer]])[0]
+    if float(probability[1]) > 0.5:
+        print("You'll be offered")
+    else:
+        print("Sorry you'll not be offered")
